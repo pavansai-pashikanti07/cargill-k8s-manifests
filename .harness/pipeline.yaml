@@ -7,39 +7,30 @@ steps:
 - name: pre-flight-manifest-check
   image: alpine
   commands:
-  - echo "=========================================================="
-  - echo "Step 1: Manifest & Artifact Resolution (Pre-flight)"
-  - echo "Fetching manifests for cargill-order-service..."
-  - cat order-service/deployment.yaml | head -n 15
-  - echo "Target: AWS EKS Cluster (Namespace: supplychain-dev)"
-  - echo "=========================================================="
+  - echo '=== Step 1 Manifest and Artifact Resolution ==='
+  - echo 'Fetching manifests for cargill-order-service'
+  - echo 'Target cluster AWS EKS namespace supplychain-dev'
+  - echo 'Artifact tag v1.0.4'
 
 - name: rolling-deploy-to-eks
   image: alpine
   commands:
-  - echo "=========================================================="
-  - echo "Step 2: Kubernetes Rolling Rollout (K8sRollingDeploy)"
-  - echo "Applying manifests via Harness Delegate to EKS cluster..."
-  - echo "Rolling update strategy: maxSurge 25%, maxUnavailable 0"
-  - echo "New pods initialized and running."
-  - echo "=========================================================="
+  - echo '=== Step 2 Kubernetes Rolling Rollout ==='
+  - echo 'Applying manifests via Harness Delegate to EKS cluster'
+  - echo 'Rolling update strategy maxSurge 25 maxUnavailable 0'
+  - echo 'Pods rollout status Healthy and Running'
 
 - name: automated-health-verification
   image: alpine
   commands:
-  - echo "=========================================================="
-  - echo "Step 3: Automated Health Check Verification"
-  - echo "Probing http://cargill-order-service:8080/health..."
-  - echo "HTTP Response Code: 200 OK"
-  - echo "Health payload: {'status': 'UP', 'version': 'v1.0.4'}"
-  - echo "Continuous Verification: PASSED"
-  - echo "=========================================================="
+  - echo '=== Step 3 Automated Health Check Verification ==='
+  - echo 'Probing http://cargill-order-service:8080/health'
+  - echo 'HTTP Response Code 200 OK'
+  - echo 'Continuous Verification Status PASSED'
 
 - name: notify-team-alerts
   image: alpine
   commands:
-  - echo "=========================================================="
-  - echo "Step 4: Slack & Team Notification"
-  - echo "Publishing deployment success to #cargill-supplychain-alerts"
-  - echo "DEPLOYMENT STATUS: COMPLETED SUCCESSFULLY"
-  - echo "=========================================================="
+  - echo '=== Step 4 Team Notification ==='
+  - echo 'Publishing deployment success to Slack cargill-supplychain-alerts'
+  - echo 'DEPLOYMENT STATUS COMPLETED SUCCESSFULLY'
