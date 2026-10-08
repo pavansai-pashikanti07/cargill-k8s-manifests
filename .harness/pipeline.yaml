@@ -1,0 +1,120 @@
+pipeline:
+  name: Cargill_Order_Service_CD_Pipeline
+  identifier: Cargill_Order_Service_CD_Pipeline
+  projectIdentifier: Cargill_SupplyChain
+  orgIdentifier: default
+  tags:
+    team: devops
+    tier: tier-1-critical
+  stages:
+    - stage:
+        name: Deploy to AWS EKS
+        identifier: Deploy_to_AWS_EKS
+        description: Rolling rollout to Amazon EKS with Automated Health Checks & Auto-Rollback
+        type: Deployment
+        spec:
+          deploymentType: Kubernetes
+          service:
+            name: order-service
+            identifier: order_service
+            serviceDefinition:
+              type: Kubernetes
+              spec:
+                manifests:
+                  - manifest:
+                      identifier: k8s_manifests
+                      type: K8sManifest
+                      spec:
+                        store:
+                          type: Git
+                          spec:
+                            connectorRef: Git_Cargill_Manifests_Connector
+                            gitFetchType: Branch
+                            paths:
+                              - order-service/deployment.yaml
+                              - order-service/service.yaml
+                            branch: main
+                artifacts:
+                  primary:
+                    primaryArtifactRef: order_service_image
+                    sources:
+                      - spec:
+                          connectorRef: JFrog_Artifactory_Connector
+                          imagePath: supplychain/order-service
+                          tag: <+input.DOCKER_IMAGE_TAG>
+                        identifier: order_service_image
+                        type: DockerRegistry
+          environment:
+            name: dev-eks
+            identifier: dev_eks
+            type: PreProduction
+            infrastructureDefinitions:
+              - identifier: cargill_eks_cluster_dev
+                name: Cargill EKS Cluster Dev
+                type: KubernetesDirect
+                spec:
+                  connectorRef: AWS_EKS_Cluster_Connector
+                  namespace: supplychain-dev
+                  releaseName: order-service
+          execution:
+            steps:
+              - step:
+                  name: Rolling Deployment to Cluster
+                  identifier: RolloutDeployment
+                  type: K8sRollingDeploy
+                  timeout: 10m
+                  spec:
+                    skipDryRun: false
+                    pruneList: []
+
+              - step:
+                  name: Automated Health Check & Verification
+                  identifier: AutomatedHealthVerification
+                  type: Http
+                  timeout: 5m
+                  spec:
+                    url: http://cargill-order-service.supplychain-dev.svc.cluster.local/health
+                    method: GET
+                    headers:
+                      - key: Accept
+                        value: application/json
+                    assertion: <+httpResponseCode> == 200 && <+json.select("status", httpResponseBody)> == "UP"
+
+              - step:
+                  name: Notify Team via Slack
+                  identifier: NotifyTeam
+                  type: Email
+                  spec:
+                    to: devops-alerts@cargill.com
+                    subject: "Deployment Success: order-service deployed with tag <+input.DOCKER_IMAGE_TAG>"
+                    body: "Order service successfully rolled out to EKS dev environment."
+
+            rollbackSteps:
+              - step:
+                  name: Automated Rollback on Deployment Failure
+                  identifier: RollbackDeployment
+                  type: K8sRollingRollback
+                  timeout: 10m
+                  spec:
+                    pruneList: []
+
+              - step:
+                  name: Notify Rollback Incident
+                  identifier: NotifyRollback
+                  type: Email
+                  spec:
+                    to: devops-alerts@cargill.com
+                    subject: "[ALERT] Rollback Executed: order-service deployment failed"
+                    body: "Health check or pod startup failed for tag <+input.DOCKER_IMAGE_TAG>. Automatic rollback completed."
+
+  variables:
+    - name: DOCKER_IMAGE_TAG
+      type: String
+      description: "Docker image tag passed dynamically from GitHub Actions CI payload"
+      required: true
+      value: <+input>
+    - name: ENVIRONMENT
+      type: String
+      description: "Target deployment environment"
+      required: true
+      value: "dev-eks"
